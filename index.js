@@ -1,17 +1,9 @@
 import TelegramBot from "node-telegram-bot-api";
-import dotenv from "dotenv";
 import fetch from "node-fetch";
-
+import dotenv from "dotenv";
 dotenv.config();
 
-const bot = new TelegramBot(process.env.BOT_TOKEN, {
-  polling: {
-    autoStart: false,
-  },
-});
-
-// Старт polling вручную после настройки
-bot.startPolling();
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
 bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
@@ -20,12 +12,21 @@ bot.on("message", async (msg) => {
   const messages = [
     {
       role: "system",
-      content: "Ты — виртуальный помощник Booking Hub в Сочи. Отвечай кратко, по делу и дружелюбно.",
+      content: `Ты — виртуальный помощник Booking Hub в Сочи.
+
+Отвечай кратко, чётко, дружелюбно, по существу.
+
+❌ Не пиши размышления, объяснения, внутренние мысли или инструкции.
+❌ Не используй теги <think> и не описывай процесс ответа.
+✅ Дай только готовый ответ от лица команды Booking Hub.`,
     },
     { role: "user", content: text },
   ];
 
   try {
+    // ⌨️ Показываем, что бот печатает
+    await bot.sendChatAction(chatId, "typing");
+
     const res = await fetch("https://api.novita.ai/v3/openai/chat/completions", {
       method: "POST",
       headers: {
@@ -35,15 +36,24 @@ bot.on("message", async (msg) => {
       body: JSON.stringify({
         model: "deepseek/deepseek-r1-turbo",
         messages,
+        temperature: 1,
+        max_tokens: 1024,
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0,
         response_format: { type: "text" },
       }),
     });
 
     const data = await res.json();
-    const reply = data?.choices?.[0]?.message?.content || "Ошибка получения ответа.";
-    bot.sendMessage(chatId, reply);
+    let reply = data?.choices?.[0]?.message?.content || "Не удалось получить ответ.";
+
+    // 🧹 Удаляем размышления (теги <think>)
+    reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+    await bot.sendMessage(chatId, reply);
   } catch (err) {
     console.error("Ошибка:", err);
-    bot.sendMessage(chatId, "Произошла ошибка при обращении к ассистенту.");
+    await bot.sendMessage(chatId, "Произошла ошибка. Попробуй позже.");
   }
 });
