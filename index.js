@@ -9,24 +9,24 @@ bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
 
+  // Показать "бот печатает..."
+  await bot.sendChatAction(chatId, "typing");
+
   const messages = [
     {
       role: "system",
       content: `Ты — виртуальный помощник Booking Hub в Сочи.
 
-Отвечай кратко, чётко, дружелюбно, по существу.
+Отвечай кратко, дружелюбно, по делу, от лица команды Booking Hub.
 
-❌ Не пиши размышления, объяснения, внутренние мысли или инструкции.
-❌ Не используй теги <think> и не описывай процесс ответа.
-✅ Дай только готовый ответ от лица команды Booking Hub.`,
+❌ Не добавляй размышления, пояснения, внутренние мысли или инструкции.
+❌ Никогда не используй теги <think> или подобные.
+✅ Давай только готовый, дружелюбный ответ. Пример: "Кондиционеры работают на полную! 😎 Хотите помощь с жильём?"`,
     },
     { role: "user", content: text },
   ];
 
   try {
-    // ⌨️ Показываем, что бот печатает
-    await bot.sendChatAction(chatId, "typing");
-
     const res = await fetch("https://api.novita.ai/v3/openai/chat/completions", {
       method: "POST",
       headers: {
@@ -36,24 +36,21 @@ bot.on("message", async (msg) => {
       body: JSON.stringify({
         model: "deepseek/deepseek-r1-turbo",
         messages,
-        temperature: 1,
-        max_tokens: 1024,
-        top_p: 1,
-        frequency_penalty: 0,
-        presence_penalty: 0,
+        temperature: 0.9,
+        max_tokens: 1000,
         response_format: { type: "text" },
       }),
     });
 
     const data = await res.json();
-    let reply = data?.choices?.[0]?.message?.content || "Не удалось получить ответ.";
+    let reply = data?.choices?.[0]?.message?.content || "Извините, не удалось получить ответ.";
 
-    // 🧹 Удаляем размышления (теги <think>)
+    // Удаляем размышления, если остались
     reply = reply.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
-    await bot.sendMessage(chatId, reply);
+    bot.sendMessage(chatId, reply);
   } catch (err) {
     console.error("Ошибка:", err);
-    await bot.sendMessage(chatId, "Произошла ошибка. Попробуй позже.");
+    bot.sendMessage(chatId, "Произошла ошибка. Попробуйте позже.");
   }
 });
